@@ -20,7 +20,7 @@
 # timeout and a message
 
 # =========================
-package TWiki::Plugins::BlackListPlugin;
+package Foswiki::Plugins::BlackListPlugin;
 
 # =========================
 use vars qw(
@@ -28,13 +28,13 @@ use vars qw(
         $debug %cfg
         $userScore $isBlackSheep
     );
-use vars qw( %TWikiCompatibility );
+use vars qw( %FoswikiCompatibility );
 
 BEGIN {
-# This should always be $Rev: 13186 $ so that TWiki can determine the checked-in
+# This should always be $Rev$ so that TWiki can determine the checked-in
 # status of the plugin. It is used by the build automation tools, so
 # you should leave it alone.
-$VERSION = '$Rev: 13186 $';
+$VERSION = '$Rev$';
 
 # This is a free-form string you can use to "name" your own plugin version.
 # It is *not* used by the build automation tools, but is reported as part
@@ -61,13 +61,13 @@ $RELEASE = 'any TWiki';
 # =========================
 sub writeDebug
 {
-    TWiki::Func::writeDebug("$pluginName - " . $_[0]) if $debug;
+    Foswiki::Func::writeDebug("$pluginName - " . $_[0]) if $debug;
 }
 
 # =========================
 sub writeDebugTimes
 {
-    TWiki::Func::writeDebugTimes("$pluginName - " . $_[0]) if $debug;
+    Foswiki::Func::writeDebugTimes("$pluginName - " . $_[0]) if $debug;
 }
 
 # =========================
@@ -76,23 +76,23 @@ sub initPlugin
     ( $topic, $web, $user, $installWeb ) = @_;
 
     # check for Plugins.pm versions
-    if( $TWiki::Plugins::VERSION < 1 ) {
-        TWiki::Func::writeWarning( "Version mismatch between $pluginName and Plugins.pm" );
+    if( $Foswiki::Plugins::VERSION < 1 ) {
+        Foswiki::Func::writeWarning( "Version mismatch between $pluginName and Plugins.pm" );
         return 0;
     }
 
     # get debug flag
-    $debug = TWiki::Func::getPreferencesFlag( "\U$pluginName\E_DEBUG" );
+    $debug = Foswiki::Func::getPreferencesFlag( "\U$pluginName\E_DEBUG" );
 
-    my $cgiQuery = TWiki::Func::getCgiQuery();
+    my $cgiQuery = Foswiki::Func::getCgiQuery();
 
     # Registration protection
     if( ( $cgiQuery ) && ( $ENV{'SCRIPT_NAME'} ) && ( $ENV{'SCRIPT_NAME'} =~ /^.*\/register/ ) ) {
         my $magic = $cgiQuery->param('rx') || "";
         $magic = "" unless( $magic =~ s/.*?([0-9]+).*/$1/s );
-        my $expire = TWiki::Func::getPreferencesValue( "\U$pluginName\E_REGEXPIRE" ) || 0;
+        my $expire = Foswiki::Func::getPreferencesValue( "\U$pluginName\E_REGEXPIRE" ) || 0;
         $expire = 0 unless( $expire =~ s/.*?([0-9]+).*/$1/s );
-        if( $TWiki::Plugins::VERSION >= 1.1 ) {
+        if( $Foswiki::Plugins::VERSION >= 1.1 ) {
             # look at magic number only for register, not for verify, resetPassword or approve
             my $regAction = $cgiQuery->param('action') || "";
             $expire = 0 if( $regAction =~ /^(verify|resetPassword|approve)$/ );
@@ -102,7 +102,7 @@ sub initPlugin
             $expire = time() - $expire;
             my $fileName = _makeFileName( "magic" );
             my $ok = 0;
-            foreach( split( /\n/, TWiki::Func::readFile( $fileName ) ) ) {
+            foreach( split( /\n/, Foswiki::Func::readFile( $fileName ) ) ) {
                  if( /^([0-9]+) ([0-9]+)/ ) {
                      my $fmagic = $1;
                      my $ftime = $2;
@@ -115,10 +115,10 @@ sub initPlugin
             unless( $ok ) {
                 # magic number expired
                 _writeLog( "REGEXPIRE: Magic $magic is missing, bad or expired" );
-                my $msg = TWiki::Func::getPreferencesValue( "\U$pluginName\E_REGMESSAGE" ) ||
+                my $msg = Foswiki::Func::getPreferencesValue( "\U$pluginName\E_REGMESSAGE" ) ||
                       "Registration failed, please try again.";
                 $ok = "[[%SYSTEMWEB%.UserRegistration][OK]]";
-                my $url = TWiki::Func::getOopsUrl( $web, $topic, "oopsblacklist", $msg, $ok );
+                my $url = Foswiki::Func::getOopsUrl( $web, $topic, "oopsblacklist", $msg, $ok );
                 print $cgiQuery->redirect( $url );
                 exit 0; # should never reach this
             }
@@ -126,12 +126,12 @@ sub initPlugin
     }
 
     # initialize for rel="nofollow" links
-    $urlHost = TWiki::Func::getUrlHost();
-    $noFollowAge = TWiki::Func::getPreferencesValue( "\U$pluginName\E_NOFOLLOWAGE" ) || 0;
+    $urlHost = Foswiki::Func::getUrlHost();
+    $noFollowAge = Foswiki::Func::getPreferencesValue( "\U$pluginName\E_NOFOLLOWAGE" ) || 0;
     $noFollowAge = 0 unless( $noFollowAge =~ s/.*?(\-?[0-9]*.*)/$1/s );
     if( $noFollowAge > 0 ) {
         $noFollowAge *= 3600;
-        my( $date ) = TWiki::Func::getRevisionInfo( $web, $topic );
+        my( $date ) = Foswiki::Func::getRevisionInfo( $web, $topic );
         $topicAge = time() - $date if( $date );
     } 
 
@@ -139,7 +139,7 @@ sub initPlugin
     my $whiteList = _getWhiteListRegex();
 
     # black list
-    my $blackList = TWiki::Func::getPreferencesValue( "\U$pluginName\E_BLACKLIST" ) || "";
+    my $blackList = Foswiki::Func::getPreferencesValue( "\U$pluginName\E_BLACKLIST" ) || "";
     $blackList = join( "|", map { quotemeta } split( /,\s*/, $blackList ) );
 
     # ban list
@@ -165,7 +165,7 @@ sub initPlugin
             # check for new candidate of black sheep
 
             my( $c1, $c2, $c3, $c4, $c5, $c6 ) =
-                split( /,\s*/, TWiki::Func::getPreferencesValue( "\U$pluginName\E_BANLISTCONFIG" ) );
+                split( /,\s*/, Foswiki::Func::getPreferencesValue( "\U$pluginName\E_BANLISTCONFIG" ) );
             $cfg{ "ptReg" }   = $c1 || 10;
             $cfg{ "ptChg" }   = $c2 || 5;
             $cfg{ "ptView" }  = $c3 || 1;
@@ -195,10 +195,10 @@ sub initPlugin
             unless( $cgiQuery ) {
                 exit 1; # Force a "500 Internal Server Error" error
             }
-            my $msg = TWiki::Func::getPreferencesValue( "\U$pluginName\E_BLACKLISTMESSAGE" ) ||
+            my $msg = Foswiki::Func::getPreferencesValue( "\U$pluginName\E_BLACKLISTMESSAGE" ) ||
                       "You are black listed at %WIKITOOLNAME%.";
             my $ok = "[[http://en.wikipedia.org/wiki/Link_spam][OK]]";
-            my $url = TWiki::Func::getOopsUrl( $web, $topic, "oopsblacklist", $msg, $ok );
+            my $url = Foswiki::Func::getOopsUrl( $web, $topic, "oopsblacklist", $msg, $ok );
             print $cgiQuery->redirect( $url );
             exit 0; # should never reach this
         }
@@ -221,9 +221,9 @@ sub commonTagsHandler
 
 # =========================
 
-# Stop TWiki registering the endRenderingHandler with TWiki::Plugins 1.1
+# Stop TWiki registering the endRenderingHandler with Foswiki::Plugins 1.1
 # or later
-$TWikiCompatibility{endRenderingHandler} = 1.1;
+$FoswikiCompatibility{endRenderingHandler} = 1.1;
 
 sub endRenderingHandler
 {
@@ -236,7 +236,7 @@ sub endRenderingHandler
     postRenderingHandler( @_ );
 }
 
-# This handler will only be called by TWiki before TWiki::Plugins 1.1
+# This handler will only be called by TWiki before Foswiki::Plugins 1.1
 sub postRenderingHandler {
 ### my ( $text ) = @_;   # do not uncomment, use $_[0] instead
 
@@ -250,13 +250,13 @@ sub beforeSaveHandler
 ### my ( $text, $topic, $web ) = @_;   # do not uncomment, use $_[0], $_[1]... instead
 
     writeDebug( "beforeSaveHandler( $_[2].$_[1] )" );
-    # This handler is called by TWiki::Store::saveTopic just before the save action.
+    # This handler is called by Foswiki::Store::saveTopic just before the save action.
 
     # Bail out unless spam filtering is enabled
-    return unless( TWiki::Func::getPreferencesFlag( "\U$pluginName\E_FILTERWIKISPAM" ) );
+    return unless( Foswiki::Func::getPreferencesFlag( "\U$pluginName\E_FILTERWIKISPAM" ) );
 
     # Bail out for excluded topics
-    my @arr = split( /,\s*/, TWiki::Func::getPreferencesValue( "\U$pluginName\E_SPAMEXCLUDETOPICS" ) );
+    my @arr = split( /,\s*/, Foswiki::Func::getPreferencesValue( "\U$pluginName\E_SPAMEXCLUDETOPICS" ) );
     foreach( @arr ) {
         return if( ( /^(.*)/ ) && ( $1 eq "$_[2].$_[1]" ) );
     }
@@ -292,11 +292,11 @@ sub beforeAttachmentSaveHandler
     my $tmpFilename    = $attachmentAttr->{"tmpFilename"}
                       || $attachmentAttr->{"file"};  # workaround for TWiki 4.0.2 bug
 
-    # This handler is called by TWiki::Store::saveAttachment just before the save action
+    # This handler is called by Foswiki::Store::saveAttachment just before the save action
     writeDebug( "beforeAttachmentSaveHandler( $_[2].$_[1], $attachmentName )" );
 
     # Bail out unless spam filtering is enabled
-    return unless( TWiki::Func::getPreferencesFlag( "\U$pluginName\E_FILTERWIKISPAM" ) );
+    return unless( Foswiki::Func::getPreferencesFlag( "\U$pluginName\E_FILTERWIKISPAM" ) );
 
     # test only attachments of type .html and a few more
     return unless( $attachmentName =~ m/\.(html?|txt|js|css)$/i );
@@ -307,7 +307,7 @@ sub beforeAttachmentSaveHandler
     return if( $remoteAddr =~ /^$whiteList/ );
 
     # check for evil eval() or escape() spam in <script>
-    my $text = TWiki::Func::readFile( $tmpFilename );
+    my $text = Foswiki::Func::readFile( $tmpFilename );
     if( $text =~ /<script.*?(eval|escape) *\(.*?<\/script>/gis ) {
         _oopsMessage( "html", "script eval() or escape()", $remoteAddr );
     }
@@ -325,16 +325,16 @@ sub _oopsMessage
 {
     my ( $type, $badword, $remoteAddr ) = @_;
 
-    my $cgiQuery = TWiki::Func::getCgiQuery();
+    my $cgiQuery = Foswiki::Func::getCgiQuery();
     if( $cgiQuery ) {
         _handleBanList( "add", $remoteAddr );
         _writeLog( "SPAMLIST add: $remoteAddr, $type spam '$badword'" );
 
-        my $msg = TWiki::Func::getPreferencesValue( "\U$pluginName\E_WIKISPAMMESSAGE" ) ||
+        my $msg = Foswiki::Func::getPreferencesValue( "\U$pluginName\E_WIKISPAMMESSAGE" ) ||
                   "Spam detected, '%WIKISPAMWORD%' is a banned word and cannot be saved.";
         $msg =~ s/%WIKISPAMWORD%/$badword/;
         my $ok = "[[http://en.wikipedia.org/wiki/Spamdexing][OK]]";
-        $url = TWiki::Func::getOopsUrl( $web, $topic, "oopsblacklist", $msg, $ok );
+        $url = Foswiki::Func::getOopsUrl( $web, $topic, "oopsblacklist", $msg, $ok );
         print $cgiQuery->redirect( $url );
         exit 0; # should never reach this
     }
@@ -345,7 +345,7 @@ sub _oopsMessage
 # =========================
 sub _getWhiteListRegex
 {
-    my $regex = TWiki::Func::getPreferencesValue( "\U$pluginName\E_WHITELIST" ) || "127.0.0.1";
+    my $regex = Foswiki::Func::getPreferencesValue( "\U$pluginName\E_WHITELIST" ) || "127.0.0.1";
     $regex = join( "|", map { quotemeta } split( /,\s*/, $regex ) );
     return "($regex)";
 }
@@ -353,14 +353,14 @@ sub _getWhiteListRegex
 # =========================
 sub _getSpamListRegex
 {
-    my $refresh = TWiki::Func::getPreferencesValue( "\U$pluginName\E_SPAMREGEXREFRESH" ) || 5;
+    my $refresh = Foswiki::Func::getPreferencesValue( "\U$pluginName\E_SPAMREGEXREFRESH" ) || 5;
     $refresh = 1 unless( $refresh =~ s/.*?([0-9]+).*/$1/s );
     $refresh = 1 if( $refresh < 1 );
 
     my $cacheFile = _makeFileName( "spam_regex" );
     if( ( -e $cacheFile ) && ( ( time() - (stat(_))[9] ) <= ( $refresh * 60 ) ) ) {
         # return cached version if it exists and isn't too old
-        return TWiki::Func::readFile( $cacheFile );
+        return Foswiki::Func::readFile( $cacheFile );
     }
 
     # merge public and local spam list
@@ -377,23 +377,23 @@ sub _getSpamListRegex
     $text =~ s/[\n\r]+$//os;
     $text =~ s/[\n\r]+/\|/gos;
     $text = "(http://[\\w\\.\\-:\\@/]*?($text))";
-    TWiki::Func::saveFile( $cacheFile, $text );
+    Foswiki::Func::saveFile( $cacheFile, $text );
     return $text;
 }
 
 # =========================
 sub _getSpamMergeText
 {
-    my $url = TWiki::Func::getPreferencesValue( "\U$pluginName\E_SPAMLISTURL" ) ||
+    my $url = Foswiki::Func::getPreferencesValue( "\U$pluginName\E_SPAMLISTURL" ) ||
               'http://arch.thinkmo.de/cgi-bin/spam-merge';
-    my $refresh = TWiki::Func::getPreferencesValue( "\U$pluginName\E_SPAMLISTREFRESH" ) || 10;
+    my $refresh = Foswiki::Func::getPreferencesValue( "\U$pluginName\E_SPAMLISTREFRESH" ) || 10;
     $refresh = 10 unless( $refresh =~ s/.*?([0-9]+).*/$1/s );
     $refresh = 10 if( $refresh < 10 );
 
     my $cacheFile = _makeFileName( "spam_merge" );
     if( ( -e $cacheFile ) && ( ( time() - (stat(_))[9] ) <= ( $refresh * 60 ) ) ) {
         # return cached version if it exists and isn't too old
-        return TWiki::Func::readFile( $cacheFile );
+        return Foswiki::Func::readFile( $cacheFile );
     }
 
     # read spam merge list via http
@@ -403,22 +403,22 @@ sub _getSpamMergeText
     my $path = $2;
     my $text = '';
     my $headerAndContent = 1;
-    if( $TWiki::Plugins::VERSION < 1.1 ) {
+    if( $Foswiki::Plugins::VERSION < 1.1 ) {
         # TWiki 01 Sep 2004 and older
-        $text = TWiki::Net::getUrl( $host, $port, $path );
-    } elsif( $TWiki::Plugins::VERSION < 1.11 ) {
+        $text = Foswiki::Net::getUrl( $host, $port, $path );
+    } elsif( $Foswiki::Plugins::VERSION < 1.11 ) {
         # TWiki 4.0
-        $text = $TWiki::Plugins::SESSION->{net}->getUrl( $host, $port, $path );
-    } elsif( $TWiki::Plugins::VERSION < 1.12 ) {
+        $text = $Foswiki::Plugins::SESSION->{net}->getUrl( $host, $port, $path );
+    } elsif( $Foswiki::Plugins::VERSION < 1.12 ) {
         # TWiki 4.1
-        $text = $TWiki::Plugins::SESSION->{net}->getUrl( 'http', $host, $port, $path );
+        $text = $Foswiki::Plugins::SESSION->{net}->getUrl( 'http', $host, $port, $path );
     } else {
         # TWiki 4.2
-        my $response = TWiki::Func::getExternalResource( $url );
+        my $response = Foswiki::Func::getExternalResource( $url );
         if( $response->is_error() ) {
             my $msg = "Code " . $response->code() . ": " . $response->message();
             $msg =~ s/[\n\r]/ /gos;
-            TWiki::Func::writeDebug( "- $pluginName ERROR: Can't read $url ($msg)" );
+            Foswiki::Func::writeDebug( "- $pluginName ERROR: Can't read $url ($msg)" );
             return "#ERROR: Can't read $url ($msg)";
         } else {
             $text = $response->content();
@@ -430,12 +430,12 @@ sub _getSpamMergeText
         if( $text =~ /text\/plain\s*ERROR\: (.*)/s ) {
             my $msg = $1;
             $msg =~ s/[\n\r]/ /gos;
-            TWiki::Func::writeDebug( "- $pluginName ERROR: Can't read $url ($msg)" );
+            Foswiki::Func::writeDebug( "- $pluginName ERROR: Can't read $url ($msg)" );
             return "#ERROR: Can't read $url ($msg)";
         }
         if( $text =~ /HTTP\/[0-9\.]+\s*([0-9]+)\s*([^\n]*)/s ) {
             unless( $1 == 200 ) {
-                TWiki::Func::writeDebug( "- $pluginName ERROR: Can't read $url ($1 $2)" );
+                Foswiki::Func::writeDebug( "- $pluginName ERROR: Can't read $url ($1 $2)" );
                 return "#ERROR: Can't read $url ($1 $2)";
             }
         }
@@ -445,11 +445,11 @@ sub _getSpamMergeText
     $text =~ s/^.*?\n\n(.*)/$1/os if( $headerAndContent );  # strip header
     unless( $text =~ /.{128}/ ) {
         # spam-merge file is too short, possibly temporary read error
-        TWiki::Func::writeDebug( "- $pluginName WARNING: Content of $url is too short, using old cache" );
-        TWiki::Func::saveFile(  _makeFileName( "spam_merge_err" ), $text );
-        $text = TWiki::Func::readFile( $cacheFile ); # read old cache content
+        Foswiki::Func::writeDebug( "- $pluginName WARNING: Content of $url is too short, using old cache" );
+        Foswiki::Func::saveFile(  _makeFileName( "spam_merge_err" ), $text );
+        $text = Foswiki::Func::readFile( $cacheFile ); # read old cache content
     }
-    TWiki::Func::saveFile( $cacheFile, $text );
+    Foswiki::Func::saveFile( $cacheFile, $text );
     return $text;
 }
 
@@ -460,7 +460,7 @@ sub _handleSpamList
     my ( $theAction, $theValue ) = @_;
     my $fileName = _makeFileName( "spam_list", 0 );
     writeDebug( "_handleSpamList( Action: $theAction, value: $theValue, file: $fileName )" );
-    my $text = TWiki::Func::readFile( $fileName ) || "# The spam-list is a generated file, do not edit\n";
+    my $text = Foswiki::Func::readFile( $fileName ) || "# The spam-list is a generated file, do not edit\n";
     if( $theAction eq "read" ) {
         $text =~ s/^\#[^\n]*\n//s;
         return $text;
@@ -497,13 +497,13 @@ sub _handleSpamList
 
     if (@errorMessages) {
       writeDebug("spamlist=$text");
-      return '<div class="twikiAlert">' .  join("<br /> ", @errorMessages) . '</div>';
+      return '<div class="foswikiAlert">' .  join("<br /> ", @errorMessages) . '</div>';
 
     } else {
       if (@infoMessages) {
         # SMELL: overwrites a concurrent save
         writeDebug("spamlist=$text");
-        TWiki::Func::saveFile( $fileName, $text );
+        Foswiki::Func::saveFile( $fileName, $text );
         return '<br />' . join( "<br /> ", @infoMessages );
 
       } else {
@@ -518,7 +518,7 @@ sub _handleExcludeList
     my ( $theAction, $theValue ) = @_;
     my $fileName = _makeFileName( "exclude_list", 0 );
     writeDebug( "_handleExcludeList( Action: $theAction, value: $theValue, file: $fileName )" );
-    my $text = TWiki::Func::readFile( $fileName ) || "# The exclude-list is a generated file, do not edit\n";
+    my $text = Foswiki::Func::readFile( $fileName ) || "# The exclude-list is a generated file, do not edit\n";
     if( $theAction eq "read" ) {
         $text =~ s/^\#[^\n]*\n//s;
         return $text;
@@ -555,13 +555,13 @@ sub _handleExcludeList
 
     if (@errorMessages) {
       writeDebug("excludelist=$text");
-      return '<div class="twikiAlert">' .  join("<br /> ", @errorMessages) . '</div>';
+      return '<div class="foswikiAlert">' .  join("<br /> ", @errorMessages) . '</div>';
 
     } else {
       if (@infoMessages) {
         # SMELL: overwrites a concurrent save
         writeDebug("excludelist=$text");
-        TWiki::Func::saveFile( $fileName, $text );
+        Foswiki::Func::saveFile( $fileName, $text );
         return '<br />' . join( "<br /> ", @infoMessages );
 
       } else {
@@ -574,26 +574,26 @@ sub _handleExcludeList
 sub _handleBlackList
 {
     my( $theAttributes, $theWeb, $theTopic ) = @_;
-    my $action = TWiki::Func::extractNameValuePair( $theAttributes, "action" );
-    my $value  = TWiki::Func::extractNameValuePair( $theAttributes, "value" );
+    my $action = Foswiki::Func::extractNameValuePair( $theAttributes, "action" );
+    my $value  = Foswiki::Func::extractNameValuePair( $theAttributes, "value" );
     my $text = "";
 
     writeDebug( "_handleBlackList( Action: $action, value: $value, topic: $theWeb.$theTopic )" );
     if( $action eq "magic" ) {
         $text = int( rand( 100000 ) ) + 1;
         my $time = time();
-        my $expire = TWiki::Func::getPreferencesValue( "\U$pluginName\E_REGEXPIRE" ) || 0;
+        my $expire = Foswiki::Func::getPreferencesValue( "\U$pluginName\E_REGEXPIRE" ) || 0;
         $expire = 0 unless( $expire =~ s/.*?([0-9]+).*/$1/s );
         $expire *= 60;
         $expire = $time - $expire;
         my $fileName = _makeFileName( "magic" );
         # read magic file
-        my $mtext = TWiki::Func::readFile( $fileName );
+        my $mtext = Foswiki::Func::readFile( $fileName );
         # remove expired numbers
         my @magic = grep { /^[0-9]+ ([0-9]+)/ && ( $1 > $expire ) } split( /[\n\r]+/, $mtext );
         # add new magic number with timestamp
         $magic[++$#magic] = "$text $time";
-        TWiki::Func::saveFile( $fileName, join( "\n", @magic )  . "\n" );
+        Foswiki::Func::saveFile( $fileName, join( "\n", @magic )  . "\n" );
 
     } elsif( $action eq "ban_show" ) {
         $text = _handleBanList( "read", "" );
@@ -619,8 +619,8 @@ sub _handleBlackList
     } elsif( $action =~ /^(ban_add|ban_remove|spam_add|spam_remove|exclude_add|exclude_remove)$/ ) {
         my $anchor = "#BanList";
         if( "$theWeb.$theTopic" eq "$installWeb.$pluginName" ) {
-            my $wikiName = &TWiki::Func::userToWikiName( $user );
-            if( TWiki::Func::checkAccessPermission( "CHANGE", $wikiName, "", $pluginName, $installWeb ) ) {
+            my $wikiName = &Foswiki::Func::userToWikiName( $user );
+            if( Foswiki::Func::checkAccessPermission( "CHANGE", $wikiName, "", $pluginName, $installWeb ) ) {
                 if( $action eq "ban_add" ) {
                     $text .= _handleBanList( "add", $value );
                     _writeLog( "BANLIST add: $value, by user" );
@@ -661,7 +661,7 @@ sub _handleBanList
     my ( $theAction, $theIPs ) = @_;
     my $fileName = _makeFileName( "ban_list", 0 );
     writeDebug( "_handleBanList( Action: $theAction, IP: $theIPs, file: $fileName )" );
-    my $text = TWiki::Func::readFile( $fileName ) || "# The ban-list is a generated file, do not edit\n";
+    my $text = Foswiki::Func::readFile( $fileName ) || "# The ban-list is a generated file, do not edit\n";
     if( $theAction eq "read" ) {
         $text =~ s/^\#[^\n]*\n//s;
         return $text;
@@ -703,17 +703,17 @@ sub _handleBanList
 
     if (@errorMessages) {
       writeDebug("banlist=$text");
-      return '<div class="twikiAlert">' .  join("<br /> ", @errorMessages) . '</div>';
+      return '<div class="foswikiAlert">' .  join("<br /> ", @errorMessages) . '</div>';
 
     } else {
       if (@infoMessages) {
         # SMELL: overwrites a concurrent save 
         writeDebug("banlist=$text");
-        TWiki::Func::saveFile( $fileName, $text );
+        Foswiki::Func::saveFile( $fileName, $text );
         unless( -e "$fileName" ) {
             # assuming save failed because of missing dir
             _makeFileDir();
-            TWiki::Func::saveFile( $fileName, $text );
+            Foswiki::Func::saveFile( $fileName, $text );
         }
         return '<br />' . join( "<br /> ", @infoMessages );
 
@@ -731,7 +731,7 @@ sub _handleEventLog
     # read/update/save event logs
     my $fileName = _makeFileName( "event_log" );
     writeDebug( "_handleEventLog( IP: $theIP, type: $theType, query: $theQueryString )" );
-    my $text = TWiki::Func::readFile( $fileName ) || "# The event-list is a generated file, do not edit\n";
+    my $text = Foswiki::Func::readFile( $fileName ) || "# The event-list is a generated file, do not edit\n";
     my $time = time();
     $text .= "$time, $theIP, $theType";
     $text .= "__R_A_W__" if( $theQueryString =~ /raw\=/ );
@@ -752,7 +752,7 @@ sub _handleEventLog
         $text .= join( "\n", @arr[$index..$#arr] ) if( $index <= $#arr );
         $text .= "\n";
     }
-    TWiki::Func::saveFile( $fileName, $text );
+    Foswiki::Func::saveFile( $fileName, $text );
 
     # extract IP addresses of interest and calculate score
     my $score = 0;
@@ -778,7 +778,7 @@ sub _handleEventLog
 sub _makeFileName
 {
     my ( $name ) = @_;
-    my $dir = TWiki::Func::getPubDir() . "/$installWeb/$pluginName";
+    my $dir = Foswiki::Func::getPubDir() . "/$installWeb/$pluginName";
     return "$dir/_$name.txt";
 }
 
@@ -786,7 +786,7 @@ sub _makeFileName
 sub _makeFileDir
 {
     # Create web directory "pub/$installWeb" if needed
-    my $dir = TWiki::Func::getPubDir() . "/$installWeb";
+    my $dir = Foswiki::Func::getPubDir() . "/$installWeb";
     unless( -e "$dir" ) {
         umask( 002 );
         mkdir( $dir, 0775 );
@@ -803,11 +803,11 @@ sub _makeFileDir
 sub _writeLog
 {
     my ( $theText ) = @_;
-    if( TWiki::Func::getPreferencesFlag( "\U$pluginName\E_LOGACCESS" ) ) {
+    if( Foswiki::Func::getPreferencesFlag( "\U$pluginName\E_LOGACCESS" ) ) {
         # FIXME: Call to unofficial function
-        $TWiki::Plugins::SESSION > 1.1
-          ? $TWiki::Plugins::SESSION->writeLog( "blacklist", "$web.$topic", $theText )
-          : TWiki::Store::writeLog( "blacklist", "$web.$topic", $theText );
+        $Foswiki::Plugins::SESSION > 1.1
+          ? $Foswiki::Plugins::SESSION->writeLog( "blacklist", "$web.$topic", $theText )
+          : Foswiki::Store::writeLog( "blacklist", "$web.$topic", $theText );
         writeDebug( "BLACKLIST access, $web/$topic, $theText" );
     }
 }
