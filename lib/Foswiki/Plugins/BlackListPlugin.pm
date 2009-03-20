@@ -39,7 +39,7 @@ $VERSION = '$Rev$';
 # This is a free-form string you can use to "name" your own plugin version.
 # It is *not* used by the build automation tools, but is reported as part
 # of the version number in PLUGINDESCRIPTIONS.
-$RELEASE = 'any TWiki';
+$RELEASE = '20 Mar 2009';
 
     $pluginName = 'BlackListPlugin';  # Name of this Plugin
     %cfg =

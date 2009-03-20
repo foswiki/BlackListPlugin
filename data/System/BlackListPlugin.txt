@@ -117,7 +117,7 @@ Plugin settings are stored as preferences variables. To reference a plugin setti
 __Note:__ You do not need to install anything on the browser to use this plugin. The following instructions are for the administrator who installs the plugin on the server where Foswiki is running. 
 
 	* Download the ZIP file from the Plugin web (see below)
-	* Unzip ==%TOPIC%.zip== in your twiki installation directory. Content:
+	* Unzip ==%TOPIC%.zip== in your Foswiki installation directory. Content:
 	  | *File:* | *Description:* |
 	  | ==data/System/%TOPIC%.txt== | Plugin topic |
 	  | ==data/System/%TOPIC%.txt,v== | Plugin topic repository |
@@ -141,9 +141,10 @@ __Note:__ You do not need to install anything on the browser to use this plugin.
 
 ---++ Plugin Info
 
-|  Plugin Author: | TWiki:Main/PeterThoeny |
-|  Plugin Version: | 29 Mar 2007 (r13238) |
+|  Plugin Author: | Foswiki:Main.KennethLavrsen (from 2009), TWiki:Main/PeterThoeny (until 2007) |
+|  Plugin Version: | 20 Mar 2009 |
 |  Change History: | <!-- versions below in reverse order -->&nbsp; |
+|  20 Mar 2009: | Ported to Foswiki by Kenneth Lavrsen and given as Feel Free To Modify in Foswiki context |
 |  29 Mar 2007: | Doc fixes; change view=raw penalty from 20 to 5 |
 |  18 Mar 2007: | Scan for evil script eval() and escape() in topic text and attachments; support for TWiki 4.2 (using new =TWiki::Func::getExternalResource=) |
 |  28 Dec 2006: | Fixed bug where EXCLUDELIST pattern was removing only part of a wiki-spam pattern |
@@ -168,9 +169,8 @@ __Note:__ You do not need to install anything on the browser to use this plugin.
 |  Perl Version: | 5.005 |
 |  License: | GPL ([[http://www.gnu.org/copyleft/gpl.html][GNU General Public License]]) |
 |  Plugin Home: | http://foswiki.org/Extensions/%TOPIC% |
-|  Feedback: | http://foswiki.org/Extensions/%TOPIC%Dev |
+|  Feedback: | http://foswiki.org/Support/%TOPIC% |
 
 __Related Topics:__ %SYSTEMWEB%.DefaultPreferences, %USERSWEB%.SitePreferences, [[%SYSTEMWEB%.Plugins][Plugins]], [[http://directory.google.com/Top/Computers/Internet/Abuse/Spam/Wikispam/][Google wiki spam directory]]
 
--- TWiki:Main/PeterThoeny - 29 Mar 2007
 
