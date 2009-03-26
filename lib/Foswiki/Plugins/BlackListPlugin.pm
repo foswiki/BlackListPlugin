@@ -157,10 +157,12 @@ sub initPlugin
     # black sheep if in black list unless in white list
     $isBlackSheep = 0;
     $userScore = "N/A";
+
     if( ( $remoteAddr ) && ( $remoteAddr !~ /^$whiteList/ ) ) {
         if( $blackRE ne "()" && $remoteAddr =~ /^$blackRE/ ) {
             # already a black sheep
             $isBlackSheep = 1;
+            _writeLog( "$scriptName - already blacklisted" );
         } else {
             # check for new candidate of black sheep
 
@@ -178,15 +180,16 @@ sub initPlugin
             if( $userScore > $cfg{ "ptLimit" } ) {
                 $isBlackSheep = 1;
                 _handleBanList( "add", $remoteAddr );
-                _writeLog( "BANLIST add: $remoteAddr, $userScore over limit $cfg{ \"ptLimit\" }" );
+                _writeLog( "BANLIST add: $remoteAddr, $scriptName, $userScore over limit $cfg{ \"ptLimit\" }" );
             }
         }
     }
 
     if( $isBlackSheep ) {
         # black sheep identified
-        _writeLog( $scriptName );
         # sleep for one minute
+        # Fix me - we need to do this smarter - this is a "self DOS attack"
+        # if an attacker "machine gun" spam the site
         sleep 60 unless( $debug );
         if( $scriptName =~ /oops/ ) {
             # show oops message normal
@@ -458,7 +461,7 @@ sub _getSpamMergeText
 sub _handleSpamList
 {
     my ( $theAction, $theValue ) = @_;
-    my $fileName = _makeFileName( "spam_list", 0 );
+    my $fileName = _makeFileName( "spam_list" );
     writeDebug( "_handleSpamList( Action: $theAction, value: $theValue, file: $fileName )" );
     my $text = Foswiki::Func::readFile( $fileName ) || "# The spam-list is a generated file, do not edit\n";
     if( $theAction eq "read" ) {
@@ -516,7 +519,7 @@ sub _handleSpamList
 sub _handleExcludeList
 {
     my ( $theAction, $theValue ) = @_;
-    my $fileName = _makeFileName( "exclude_list", 0 );
+    my $fileName = _makeFileName( "exclude_list" );
     writeDebug( "_handleExcludeList( Action: $theAction, value: $theValue, file: $fileName )" );
     my $text = Foswiki::Func::readFile( $fileName ) || "# The exclude-list is a generated file, do not edit\n";
     if( $theAction eq "read" ) {
@@ -659,7 +662,7 @@ sub _handleBlackList
 sub _handleBanList
 {
     my ( $theAction, $theIPs ) = @_;
-    my $fileName = _makeFileName( "ban_list", 0 );
+    my $fileName = _makeFileName( "ban_list" );
     writeDebug( "_handleBanList( Action: $theAction, IP: $theIPs, file: $fileName )" );
     my $text = Foswiki::Func::readFile( $fileName ) || "# The ban-list is a generated file, do not edit\n";
     if( $theAction eq "read" ) {
@@ -710,11 +713,6 @@ sub _handleBanList
         # SMELL: overwrites a concurrent save 
         writeDebug("banlist=$text");
         Foswiki::Func::saveFile( $fileName, $text );
-        unless( -e "$fileName" ) {
-            # assuming save failed because of missing dir
-            _makeFileDir();
-            Foswiki::Func::saveFile( $fileName, $text );
-        }
         return '<br />' . join( "<br /> ", @infoMessages );
 
       } else {
@@ -778,36 +776,37 @@ sub _handleEventLog
 sub _makeFileName
 {
     my ( $name ) = @_;
-    my $dir = Foswiki::Func::getPubDir() . "/$installWeb/$pluginName";
+    my $dir = Foswiki::Func::getWorkArea($pluginName);
     return "$dir/_$name.txt";
-}
-
-# =========================
-sub _makeFileDir
-{
-    # Create web directory "pub/$installWeb" if needed
-    my $dir = Foswiki::Func::getPubDir() . "/$installWeb";
-    unless( -e "$dir" ) {
-        umask( 002 );
-        mkdir( $dir, 0775 );
-    }
-    # Create topic directory "pub/$installWeb/$pluginName" if needed
-    $dir .= "/$pluginName";
-    unless( -e "$dir" ) {
-        umask( 002 );
-        mkdir( $dir, 0775 );
-    }
 }
 
 # =========================
 sub _writeLog
 {
     my ( $theText ) = @_;
+
     if( Foswiki::Func::getPreferencesFlag( "\U$pluginName\E_LOGACCESS" ) ) {
-        # FIXME: Call to unofficial function
-        $Foswiki::Plugins::SESSION > 1.1
-          ? $Foswiki::Plugins::SESSION->writeLog( "blacklist", "$web.$topic", $theText )
-          : Foswiki::Store::writeLog( "blacklist", "$web.$topic", $theText );
+        # Note there is no API for writing to the normal log
+        # so we write directly to the log instead of using internal functions
+        # which change once a year on average    
+        my $log = $Foswiki::cfg{LogFileName};
+        my $now = time();
+        my $stamp = Foswiki::Func::formatTime( $now, '$year$mo', 'servertime' );
+        $log =~ s/%DATE%/$stamp/go;
+        my $time = Foswiki::Func::formatTime( $now, 'iso', 'gmtime' );
+        my $remoteAddr = $ENV{'REMOTE_ADDR'}   || "";
+        # Example log line
+        # | 2009-03-25T22:18:45Z info | MyName | blacklist | Myweb.BlackListTest | /foswiki10/bin/save | 192.168.1.11 | 
+        my $message = "| $time info | $user | blacklist | $web.$topic | $theText | $remoteAddr |";
+        my $file;
+        if ( open( $file, '>>', $log ) ) {
+            print $file "$message\n";
+            close($file);
+        }
+        else {
+            Foswiki::Func::writeWarning("BlackListPlugin could not write to the normal log - message was $message");
+        }
+        
         writeDebug( "BLACKLIST access, $web/$topic, $theText" );
     }
 }
