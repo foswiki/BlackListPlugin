@@ -1,8 +1,9 @@
 # Plugin for Foswiki - The Free and Open Source Wiki, http://foswiki.org/
 #
 # Copyright (C) 2004-2007 Peter Thoeny, peter@thoeny.org
+# Copyright (C) 2008-2009 Foswiki Contributors
 #
-# For licensing info read LICENSE file in the TWiki root.
+# For licensing info read LICENSE file in the Foswiki root.
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 2
@@ -19,44 +20,54 @@
 # Q&D implementation of backlist handler. Black sheep get a
 # timeout and a message
 
-# =========================
 package Foswiki::Plugins::BlackListPlugin;
 
-# =========================
-use vars qw(
-        $web $topic $user $installWeb $VERSION $RELEASE $pluginName
-        $debug %cfg
-        $userScore $isBlackSheep
-    );
-use vars qw( %FoswikiCompatibility );
+# Always use strict to enforce variable scoping
+use strict;
 
-BEGIN {
-# This should always be $Rev$ so that TWiki can determine the checked-in
+use Foswiki::Func ();       # The plugins API
+use Foswiki::Plugins ();    # For the API version
+
+# Short description of this plugin
+# One line description, is shown in the %SYSTEMWEB%.TextFormattingRules topic:
+our $SHORTDESCRIPTION = 'Utility to keep malicious users away from a public Foswiki site';
+
+# For this plugin it is for the moment still the plugin topic that is used for more dynamic settings
+# because many settings are of a nature where a trusted group and not only the administrator should
+# maintain the settings, making moving the settings to configure a bad choice.
+our $NO_PREFS_IN_TOPIC = 0;
+
+use vars qw(
+        $web $topic $user $installWeb $debug
+    );
+
+# This should always be $Rev$ so that Foswiki can determine the checked-in
 # status of the plugin. It is used by the build automation tools, so
 # you should leave it alone.
-$VERSION = '$Rev$';
+our $VERSION = '$Rev$';
 
 # This is a free-form string you can use to "name" your own plugin version.
 # It is *not* used by the build automation tools, but is reported as part
 # of the version number in PLUGINDESCRIPTIONS.
-$RELEASE = '20 Mar 2009';
+our $RELEASE = '04 Jan 2010';
 
-    $pluginName = 'BlackListPlugin';  # Name of this Plugin
-    %cfg =
-        (
-            "ptReg"   => 10,
-            "ptChg"   => 5,
-            "ptView"  => 1,
-            "ptRaw"   => 30,
-            "ptLimit" => 100,
-            "period"  => 300,
-        );
-    $userScore = "N/A";
-    $isBlackSheep = 0;
-    $noFollowAge = 0;
-    $topicAge = 0;
-    $urlHost = "initialized_later";
-}
+our $pluginName = 'BlackListPlugin';  # Name of this Plugin
+our %cfg =
+    (
+        "ptReg"   => 10,
+        "ptChg"   => 5,
+        "ptView"  => 1,
+        "ptRaw"   => 30,
+        "ptLimit" => 100,
+        "period"  => 300,
+    );
+our $userScore = "N/A";
+our $isBlackSheep = 0;
+our $noFollowAge = 0;
+our $topicAge = 0;
+our $urlHost = "initialized_later";
+our $banExpire = 0;
+
 
 # =========================
 sub writeDebug
@@ -76,7 +87,7 @@ sub initPlugin
     ( $topic, $web, $user, $installWeb ) = @_;
 
     # check for Plugins.pm versions
-    if( $Foswiki::Plugins::VERSION < 1 ) {
+    if( $Foswiki::Plugins::VERSION < 2.0 ) {
         Foswiki::Func::writeWarning( "Version mismatch between $pluginName and Plugins.pm" );
         return 0;
     }
@@ -84,56 +95,25 @@ sub initPlugin
     # get debug flag
     $debug = Foswiki::Func::getPreferencesFlag( "\U$pluginName\E_DEBUG" );
 
-    my $cgiQuery = Foswiki::Func::getCgiQuery();
+    Foswiki::Func::registerTagHandler( 'BLACKLISTPLUGIN', \&_handleBlackList );
 
-    # Registration protection
-    if( ( $cgiQuery ) && ( $ENV{'SCRIPT_NAME'} ) && ( $ENV{'SCRIPT_NAME'} =~ /^.*\/register/ ) ) {
-        my $magic = $cgiQuery->param('rx') || "";
-        $magic = "" unless( $magic =~ s/.*?([0-9]+).*/$1/s );
-        my $expire = Foswiki::Func::getPreferencesValue( "\U$pluginName\E_REGEXPIRE" ) || 0;
-        $expire = 0 unless( $expire =~ s/.*?([0-9]+).*/$1/s );
-        if( $Foswiki::Plugins::VERSION >= 1.1 ) {
-            # look at magic number only for register, not for verify, resetPassword or approve
-            my $regAction = $cgiQuery->param('action') || "";
-            $expire = 0 if( $regAction =~ /^(verify|resetPassword|approve)$/ );
-        }
-        if( $expire > 0 ) {
-            $expire *= 60;
-            $expire = time() - $expire;
-            my $fileName = _makeFileName( "magic" );
-            my $ok = 0;
-            foreach( split( /\n/, Foswiki::Func::readFile( $fileName ) ) ) {
-                 if( /^([0-9]+) ([0-9]+)/ ) {
-                     my $fmagic = $1;
-                     my $ftime = $2;
-                     if( ( $fmagic eq $magic ) && ( $ftime > $expire ) ) {
-                         $ok = 1;
-                         last;
-                     }
-                }
-            }
-            unless( $ok ) {
-                # magic number expired
-                _writeLog( "REGEXPIRE: Magic $magic is missing, bad or expired" );
-                my $msg = Foswiki::Func::getPreferencesValue( "\U$pluginName\E_REGMESSAGE" ) ||
-                      "Registration failed, please try again.";
-                $ok = "[[%SYSTEMWEB%.UserRegistration][OK]]";
-                my $url = Foswiki::Func::getOopsUrl( $web, $topic, "oopsblacklist", $msg, $ok );
-                print $cgiQuery->redirect( $url );
-                exit 0; # should never reach this
-            }
-        }
-    }
+    my $cgiQuery = Foswiki::Func::getCgiQuery();
 
     # initialize for rel="nofollow" links
     $urlHost = Foswiki::Func::getUrlHost();
     $noFollowAge = Foswiki::Func::getPreferencesValue( "\U$pluginName\E_NOFOLLOWAGE" ) || 0;
     $noFollowAge = 0 unless( $noFollowAge =~ s/.*?(\-?[0-9]*.*)/$1/s );
+
     if( $noFollowAge > 0 ) {
         $noFollowAge *= 3600;
         my( $date ) = Foswiki::Func::getRevisionInfo( $web, $topic );
         $topicAge = time() - $date if( $date );
-    } 
+    }
+    
+    # initialize the ban expiry - convert minutes to seconds
+    # We cannot use the usual || 0 because undefined means a 60 default
+    $banExpire = Foswiki::Func::getPreferencesValue( "\U$pluginName\E_BANEXPIRE" ) || 0;
+    $banExpire *= 60;
 
     # white list
     my $whiteList = _getWhiteListRegex();
@@ -146,8 +126,9 @@ sub initPlugin
     my $remoteAddr = $ENV{'REMOTE_ADDR'}   || "";
     my $scriptName = $ENV{'SCRIPT_NAME'}   || "";
     my $queryString = $ENV{'QUERY_STRING'} || "";
-    my $banList = _handleBanList( "read", $remoteAddr );
-    $banList = join( "|", map { quotemeta } split( /\n/, $banList ) );
+    my $banList = '';
+    my $banTimestamp = quotemeta _checkBanList( $remoteAddr );
+    $banList = $remoteAddr if $banTimestamp;
 
     # black list + ban list regular expression
     my $blackRE = "($blackList";
@@ -187,10 +168,10 @@ sub initPlugin
 
     if( $isBlackSheep ) {
         # black sheep identified
-        # sleep for one minute
-        # Fix me - we need to do this smarter - this is a "self DOS attack"
-        # if an attacker "machine gun" spam the site
-        sleep 60 unless( $debug );
+        # sleep for 5 seconds
+        # was 60 seconds but reduced to 5 to lower the risk of using this for
+        # DOS attech. 5 seconds is enough to slow down a scanning attempt
+        sleep 5 unless( $debug );
         if( $scriptName =~ /oops/ ) {
             # show oops message normal
         } else {
@@ -198,12 +179,20 @@ sub initPlugin
             unless( $cgiQuery ) {
                 exit 1; # Force a "500 Internal Server Error" error
             }
-            my $msg = Foswiki::Func::getPreferencesValue( "\U$pluginName\E_BLACKLISTMESSAGE" ) ||
-                      "You are black listed at %WIKITOOLNAME%.";
-            my $ok = "[[http://en.wikipedia.org/wiki/Link_spam][OK]]";
-            my $url = Foswiki::Func::getOopsUrl( $web, $topic, "oopsblacklist", $msg, $ok );
-            print $cgiQuery->redirect( $url );
-            exit 0; # should never reach this
+            # We cannot reliably redirect in initPlugin. So we send simple primitive message
+            # that causes minimal load on the system.
+            # A more complete solution has been discussed but this simple message gives the
+            # least load on the server when an attacker tries many times.
+            my $expireText = '';
+            if ($banExpire) {
+                 $expireText = " for another " . 
+                               int( ($banTimestamp+$banExpire-time())/60 ) .
+                               " minutes";
+            }
+            local $| = 1;
+            print CGI::header(-status => 403, -type=> 'text/plain');
+            print "You have been banned on this website$expireText";
+            exit 0;
         }
     }
 
@@ -213,35 +202,9 @@ sub initPlugin
 }
 
 # =========================
-sub commonTagsHandler
-{
-### my ( $text, $topic, $web ) = @_;   # do not uncomment, use $_[0], $_[1]... instead
 
-    writeDebug( "commonTagsHandler( $_[2].$_[1] )" );
-
-    $_[0] =~ s/%BLACKLISTPLUGIN{(.*?)}%/_handleBlackList( $1, $_[2], $_[1] )/geo;
-}
-
-# =========================
-
-# Stop TWiki registering the endRenderingHandler with Foswiki::Plugins 1.1
-# or later
-$FoswikiCompatibility{endRenderingHandler} = 1.1;
-
-sub endRenderingHandler
-{
-### my ( $text ) = @_;   # do not uncomment, use $_[0] instead
-
-    # This handler is called by getRenderedVersion just after the line loop, that is,
-    # after almost all XHTML rendering of a topic. <nop> tags are removed after this.
-
-    writeDebug( "endRenderingHandler( $web.$topic )" );
-    postRenderingHandler( @_ );
-}
-
-# This handler will only be called by TWiki before Foswiki::Plugins 1.1
 sub postRenderingHandler {
-### my ( $text ) = @_;   # do not uncomment, use $_[0] instead
+# ( $text )
 
     return unless( $noFollowAge );
     $_[0] =~ s/(<a .*?href=[\"\']?)([^\"\'\s]+[\"\']?)(\s*[a-z]*)/_handleNofollowLink( $1, $2, $3 )/geoi;
@@ -269,13 +232,15 @@ sub beforeSaveHandler
     my $remoteAddr = $ENV{'REMOTE_ADDR'}   || "";
     return if( $remoteAddr =~ /^$whiteList/ );
 
+    # First we look spam in the raw text
     my $spamListRegex = _getSpamListRegex();
-    return if( $spamListRegex =~ /\(\)$/ ); # empty list
+    return unless $spamListRegex;  # empty list
     if( $_[0] =~ /$spamListRegex/ ) {
         _oopsMessage( "topic", $1, $remoteAddr );
     }
 
     # check for evil eval() or escape() spam in <script>
+    # This provides limited protection, consider SafeWikiPlugin
     if( $_[0] =~ /<script.*?(eval|escape) *\(.*?<\/script>/gis ) {
         _oopsMessage( "topic", "script eval() or escape()", $remoteAddr );
     }
@@ -292,8 +257,7 @@ sub beforeAttachmentSaveHandler
 ### my ( $attachmentAttr, $topic, $web ) = @_;   # do not uncomment, use $_[0], $_[1]... instead
     my $attachmentAttr = $_[0];
     my $attachmentName = $attachmentAttr->{"attachment"};
-    my $tmpFilename    = $attachmentAttr->{"tmpFilename"}
-                      || $attachmentAttr->{"file"};  # workaround for TWiki 4.0.2 bug
+    my $tmpFilename    = $attachmentAttr->{"tmpFilename"};
 
     # This handler is called by Foswiki::Store::saveAttachment just before the save action
     writeDebug( "beforeAttachmentSaveHandler( $_[2].$_[1], $attachmentName )" );
@@ -317,7 +281,7 @@ sub beforeAttachmentSaveHandler
 
     # check for known spam signatures
     my $spamListRegex = _getSpamListRegex();
-    return if( $spamListRegex =~ /\(\)$/ ); # empty list
+    return unless $spamListRegex; # empty list
     if( $text =~ /$spamListRegex/ ) {
         _oopsMessage( "html", $1, $remoteAddr );
     }
@@ -329,6 +293,7 @@ sub _oopsMessage
     my ( $type, $badword, $remoteAddr ) = @_;
 
     my $cgiQuery = Foswiki::Func::getCgiQuery();
+
     if( $cgiQuery ) {
         _handleBanList( "add", $remoteAddr );
         _writeLog( "SPAMLIST add: $remoteAddr, $type spam '$badword'" );
@@ -336,24 +301,36 @@ sub _oopsMessage
         my $msg = Foswiki::Func::getPreferencesValue( "\U$pluginName\E_WIKISPAMMESSAGE" ) ||
                   "Spam detected, '%WIKISPAMWORD%' is a banned word and cannot be saved.";
         $msg =~ s/%WIKISPAMWORD%/$badword/;
-        my $ok = "[[http://en.wikipedia.org/wiki/Spamdexing][OK]]";
-        $url = Foswiki::Func::getOopsUrl( $web, $topic, "oopsblacklist", $msg, $ok );
-        print $cgiQuery->redirect( $url );
-        exit 0; # should never reach this
+        $msg = Foswiki::Func::expandCommonVariables( $msg );
+        
+        throw Foswiki::OopsException(
+            'oopsattention',
+            def => 'generic',
+            status => 403,
+            web    => $web,
+            topic  => $topic,
+            params => [ $msg || '?' ]
+        );
     }
     # else (unlikely case) force a "500 Internal Server Error" error
     exit 1;
 }
 
 # =========================
+# Gets the BLACKLISTPLUGIN_WHITELIST pref which must be comma separated
+# and returns regex in the format (xxx\\.xxx\\.xxx\\.xxx|yyy\\.yyy\\.yyy\\.yyy)
 sub _getWhiteListRegex
 {
     my $regex = Foswiki::Func::getPreferencesValue( "\U$pluginName\E_WHITELIST" ) || "127.0.0.1";
+    # Get rid of trailing spaces that the user or editor may have added
+    $regex =~ s/\s+$//;
     $regex = join( "|", map { quotemeta } split( /,\s*/, $regex ) );
     return "($regex)";
 }
 
 # =========================
+# Returns empty string if no local spam list and public never cached and
+# not available 
 sub _getSpamListRegex
 {
     my $refresh = Foswiki::Func::getPreferencesValue( "\U$pluginName\E_SPAMREGEXREFRESH" ) || 5;
@@ -379,7 +356,13 @@ sub _getSpamListRegex
     $text =~ s/^[\n\r]+//os;
     $text =~ s/[\n\r]+$//os;
     $text =~ s/[\n\r]+/\|/gos;
+
+    # We return empty string and do not save cacheFile if we have no local
+    # spam list and the public list has never been loaded    
+    return '' unless $text;
+    
     $text = "(http://[\\w\\.\\-:\\@/]*?($text))";
+    
     Foswiki::Func::saveFile( $cacheFile, $text );
     return $text;
 }
@@ -406,27 +389,16 @@ sub _getSpamMergeText
     my $path = $2;
     my $text = '';
     my $headerAndContent = 1;
-    if( $Foswiki::Plugins::VERSION < 1.1 ) {
-        # TWiki 01 Sep 2004 and older
-        $text = Foswiki::Net::getUrl( $host, $port, $path );
-    } elsif( $Foswiki::Plugins::VERSION < 1.11 ) {
-        # TWiki 4.0
-        $text = $Foswiki::Plugins::SESSION->{net}->getUrl( $host, $port, $path );
-    } elsif( $Foswiki::Plugins::VERSION < 1.12 ) {
-        # TWiki 4.1
-        $text = $Foswiki::Plugins::SESSION->{net}->getUrl( 'http', $host, $port, $path );
+
+    my $response = Foswiki::Func::getExternalResource( $url );
+    if( $response->is_error() ) {
+        my $msg = "Code " . $response->code() . ": " . $response->message();
+        $msg =~ s/[\n\r]/ /gos;
+        Foswiki::Func::writeDebug( "- $pluginName ERROR: Can't read $url ($msg)" );
+        return "#ERROR: Can't read $url ($msg)";
     } else {
-        # TWiki 4.2
-        my $response = Foswiki::Func::getExternalResource( $url );
-        if( $response->is_error() ) {
-            my $msg = "Code " . $response->code() . ": " . $response->message();
-            $msg =~ s/[\n\r]/ /gos;
-            Foswiki::Func::writeDebug( "- $pluginName ERROR: Can't read $url ($msg)" );
-            return "#ERROR: Can't read $url ($msg)";
-        } else {
-            $text = $response->content();
-            $headerAndContent = 0;
-        }
+        $text = $response->content();
+        $headerAndContent = 0;
     }
 
     if( $headerAndContent ) {
@@ -576,30 +548,15 @@ sub _handleExcludeList
 # =========================
 sub _handleBlackList
 {
-    my( $theAttributes, $theWeb, $theTopic ) = @_;
-    my $action = Foswiki::Func::extractNameValuePair( $theAttributes, "action" );
-    my $value  = Foswiki::Func::extractNameValuePair( $theAttributes, "value" );
+    my ($session, $params, $theTopic, $theWeb) = @_;
+    my $action = $params->{action} || '';
+    my $value  = $params->{value} || '';
     my $text = "";
 
     writeDebug( "_handleBlackList( Action: $action, value: $value, topic: $theWeb.$theTopic )" );
-    if( $action eq "magic" ) {
-        $text = int( rand( 100000 ) ) + 1;
-        my $time = time();
-        my $expire = Foswiki::Func::getPreferencesValue( "\U$pluginName\E_REGEXPIRE" ) || 0;
-        $expire = 0 unless( $expire =~ s/.*?([0-9]+).*/$1/s );
-        $expire *= 60;
-        $expire = $time - $expire;
-        my $fileName = _makeFileName( "magic" );
-        # read magic file
-        my $mtext = Foswiki::Func::readFile( $fileName );
-        # remove expired numbers
-        my @magic = grep { /^[0-9]+ ([0-9]+)/ && ( $1 > $expire ) } split( /[\n\r]+/, $mtext );
-        # add new magic number with timestamp
-        $magic[++$#magic] = "$text $time";
-        Foswiki::Func::saveFile( $fileName, join( "\n", @magic )  . "\n" );
 
-    } elsif( $action eq "ban_show" ) {
-        $text = _handleBanList( "read", "" );
+    if( $action eq "ban_show" ) {
+        $text = _listBanList();
         $text =~ s/[\n\r]+$//os;
         $text =~ s/[\n\r]+/, /gos;
 
@@ -658,66 +615,118 @@ sub _handleBlackList
     return $text;
 }
 
-# =========================
+# This sub returns '' if the IP address is not banned or the ban has expired
+# If IP address is still banned we return the timestamp
+sub _checkBanList
+{
+    my ( $remoteIP ) = @_;
+    my $fileName = _makeFileName( "ban_list" );
+    my $text = Foswiki::Func::readFile( $fileName ) || '';
+    if ( $text =~ /^($remoteIP)(\s+(\d+))?$/m ) {
+        # Expire the IP if older than set by BANEXPIRE (0 means do not expire)
+        # If the IP is from an old version of the plugin without timestamp
+        # we expire is now.
+        my $timestamp = $3 || 0;
+        if ( $banExpire && ( time() > $timestamp + $banExpire ) ) {
+            _handleBanList( 'remove', $remoteIP );
+            return '';
+        } else {
+            return $timestamp;
+        }
+    }
+    return '';
+}
+
+# List currently banned IP addresses after having pruned the expired IPs
+# From a performance perspective we only want to expire all rarely
+# But the feature will normally only be used in the BlackListPlugin topic
+# so it will be very rare
+sub _listBanList
+{
+    my $fileName = _makeFileName( "ban_list" );
+    my $returnText = '';
+    my $now = time();
+    my $ipExpired = 0;
+    my $text = Foswiki::Func::readFile( $fileName ) || '';
+
+    return '' unless $text;
+                
+    foreach my $line ( split( /\n/, $text ) ) {         
+        if ( $line =~ /^(\d[^\s]+)(\s+(\d+))?$/ ) {            
+            my $timestamp = $3 || 0;
+            my $currentIP = $1;
+            if ( $banExpire && ( $now > $timestamp + $banExpire ) ) {
+                $text =~ s/$line\n//g;
+                $ipExpired = 1;
+            } else {
+                my $minutesTillExpire = int( ($timestamp+$banExpire-$now)/60 );
+                $minutesTillExpire = '-' unless $banExpire;
+                $returnText .= "$currentIP ($minutesTillExpire)\n";
+            }
+        }
+    }
+    
+    Foswiki::Func::saveFile( $fileName, $text ) if $ipExpired;
+    return $returnText;
+}
+
+# Lists, adds, or removes IPs from the ban_list
 sub _handleBanList
 {
     my ( $theAction, $theIPs ) = @_;
     my $fileName = _makeFileName( "ban_list" );
     writeDebug( "_handleBanList( Action: $theAction, IP: $theIPs, file: $fileName )" );
     my $text = Foswiki::Func::readFile( $fileName ) || "# The ban-list is a generated file, do not edit\n";
-    if( $theAction eq "read" ) {
-        $text =~ s/^\#[^\n]*\n//s;
-        return $text;
-    }
 
     my @errorMessages;
     my @infoMessages;
     foreach my $theIP (split( /,\s*/, $theIPs )) {
-      $theIP =~ s/^\s+//;
-      $theIP =~ s/\s+$//;
+        $theIP =~ s/^\s+//;
+        $theIP =~ s/\s+$//;
 
-      if( $theAction eq "add" ) {
-        unless( ( $theIP ) && ( $theIP =~ /^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$/ ) ) {
-            push @errorMessages, "Error: Invalid IP address '$theIP'";
-            next;
+        if( $theAction eq "add" ) {
+            unless( ( $theIP ) && ( $theIP =~ /^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$/ ) ) {
+                push @errorMessages, "Error: Invalid IP address '$theIP'";
+                next;
+            }
+
+            if( $text =~ /\n\Q$theIP\E\n/s ) {
+                push @infoMessages, "Warning: IP address '$theIP' is already on the list";
+                next;
+            }
+
+             my $time = time();
+             $text .= "$theIP $time\n";
+
+             push @infoMessages, "Note: Added IP address '$theIP'";
+
+        } elsif( $theAction eq "remove" ) {
+            # In case the user has upgraded from an old plugin version we also
+            # allow the code to remove entries without a timestamp after the IP
+            unless( ( $theIP ) && ( $text =~ s/(\n)\Q$theIP\E( \d+)?\n/$1/s ) ) {
+                push @errorMessages, "Error: IP address '$theIP' not found";
+                next;
+            }
+            push @infoMessages, "Note: Removed IP address '$theIP'";
+        } else {
+            # never reach
+            return "Error: invalid action '$theAction'";
         }
-
-        if( $text =~ /\n\Q$theIP\E\n/s ) {
-            push @infoMessages, "Warning: IP address '$theIP' is already on the list";
-            next;
-        }
-
-        $text .= "$theIP\n";
-
-        push @infoMessages, "Note: Added IP address '$theIP'";
-
-      } elsif( $theAction eq "remove" ) {
-        unless( ( $theIP ) && ( $text =~ s/(\n)\Q$theIP\E\n/$1/s ) ) {
-            push @errorMessages, "Error: IP address '$theIP' not found";
-            next;
-        }
-        push @infoMessages, "Note: Removed IP address '$theIP'";
-
-      } else {
-        # never reach
-        return "Error: invalid action '$theAction'";
-      }
     }
 
     if (@errorMessages) {
-      writeDebug("banlist=$text");
-      return '<div class="foswikiAlert">' .  join("<br /> ", @errorMessages) . '</div>';
+        writeDebug("banlist=$text");
+        return '<div class="foswikiAlert">' .  join("<br /> ", @errorMessages) . '</div>';
 
     } else {
-      if (@infoMessages) {
-        # SMELL: overwrites a concurrent save 
-        writeDebug("banlist=$text");
-        Foswiki::Func::saveFile( $fileName, $text );
-        return '<br />' . join( "<br /> ", @infoMessages );
-
-      } else {
-        return 'Error: done nothing';
-      }
+        if (@infoMessages) {
+            # SMELL: overwrites a concurrent save 
+            writeDebug("banlist=$text");
+            Foswiki::Func::saveFile( $fileName, $text );
+            return '<br />' . join( "<br /> ", @infoMessages );
+        } else {
+            return 'Error: done nothing';
+        }
     }
 }
 
@@ -754,7 +763,7 @@ sub _handleEventLog
 
     # extract IP addresses of interest and calculate score
     my $score = 0;
-    $type = "";
+    my $type = "";
     foreach( grep { / \Q$theIP\E\,/ } split( /\n/, $text ) ) {
         if( ( /^([0-9]+)\,[^\,]+\, ?(.*)/ ) && ( $1 >= $limit ) ) {
             $type = $2;
@@ -819,10 +828,10 @@ sub _handleNofollowLink
     # Codev.SpamDefeatingViaNofollowAttribute: Add a rel="nofollow" to URL
     my $addRel = 0;
     my $text = "$thePrefix$theUrl$thePostfix";
-    $theUrl =~ m/^http/i      && ( $addRel = 1 ); # only for http and hhtps
-    $theUrl =~ m/^$urlHost/i  && ( $addRel = 0 ); # not for own host
-    $theUrl =~ m/twiki\.org/i && ( $addRel = 0 ); # not for twiki.org
-    $thePostfix =~ m/^\s?rel/ && ( $addRel = 0 ); # prevent adding it twice
+    $theUrl =~ m/^http/i      && ( $addRel = 1 );   # only for http and hhtps
+    $theUrl =~ m/^$urlHost/i  && ( $addRel = 0 );   # not for own host
+    $theUrl =~ m/foswiki\.org/i && ( $addRel = 0 ); # not for foswiki.org
+    $thePostfix =~ m/^\s?rel/ && ( $addRel = 0 );   # prevent adding it twice
 
     $addRel = 0 if( $noFollowAge > 0 && $topicAge > $noFollowAge ); # old topic
 

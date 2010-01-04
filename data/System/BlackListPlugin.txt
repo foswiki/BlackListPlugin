@@ -1,4 +1,4 @@
-%META:TOPICINFO{author="ProjectContributor" date="1195983822" format="1.0" version="1.20"}%
+%META:TOPICINFO{author="ProjectContributor" date="1195983822" format="1.1" version="$Rev$"}%
 ---+!! Black List Plugin
 
 %TOC%
@@ -8,142 +8,135 @@
 This is a simple utility to keep black sheep away from a public Foswiki site. The site can be protected against excessive page access (e.g. by bad robots), suspicious activities of users, such as multiple registrations or rapid topic updates indicating Wiki:WikiSpam, or saving text with wiki-spam.
 
 The Plugin monitors activities by IP address and uses three IP address lists to protect the Foswiki site:
-	* WHITELIST: Manually maintained list of users who should never get on the BANLIST
-	* BLACKLIST: Manually maintained list of malicious users
-	* BANLIST: Automatically updated list of users with suspicious activities
+   * WHITELIST: Manually maintained list of users who should never get on the BANLIST
+   * BLACKLIST: Manually maintained list of malicious users
+   * BANLIST: Automatically updated list of users with suspicious activities
 
 On topic save, text is compared to a known list of spam patterns. If wiki-spam is identified, topic save is cancelled, an error message is shown, and the IP address is put on the BANLIST. Two wiki-spam lists are used:
-	* Local SPAMLIST: Manually maintained list of spam patterns
-	* Public wiki-spam list: Big list of wiki-spam patterns, retrieved from external web site
+   * Local SPAMLIST: Manually maintained list of spam patterns
+   * Public wiki-spam list: Big list of wiki-spam patterns, retrieved from external web site
 
-Users on the BLACKLIST and BANLIST will have every page access delayed by one minute and will get an error message.
+Users on the BLACKLIST and BANLIST will have every page access delayed by at least 5 seconds and will get an error message.
 
-The registration form can also be protected from improper use.
+The ban can be set to expire after a number of minutes to minimize the maintenance when a spammer uses dynamic IP address or someone accidently gets banned.
 
 To fight Wiki-spam, the Plugin can also add a =rel="nofollow"= parameter to external URLs. Search engines will not follow links that have this parameter, taking away the incentive to add spam to Foswiki.
 
 ---++ Plugin Settings
 
-Plugin settings are stored as preferences variables. To reference a plugin setting write ==%<nop>&lt;plugin&gt;_&lt;setting&gt;%==, i.e. ==%<nop>INTERWIKIPLUGIN_SHORTDESCRIPTION%==
+Plugin settings are stored as preferences variables. To reference a plugin setting write ==%<nop>&lt;plugin&gt;_&lt;setting&gt;%==, i.e. ==%<nop>BLACKLISTPLUGIN_SETTING%==
+
+%X% Note: Settings made in this plugin topic will be overwritten next time you upgrade the plugin. You are adviced to define the settings in %LOCALSITEPREFS% using the format %<nop>BLACKLISTPLUGIN_SETTING%. Remember to add the settings to the list of FINALPREFERENCES in %LOCALSITEPREFS%.
 
 ---+++ General settings
-	* One line description, is shown in the %SYSTEMWEB%.TextFormattingRules topic:
-		* Set SHORTDESCRIPTION = Utility to keep malicious users away from a public Foswiki site
+   * One line description, is shown in the %SYSTEMWEB%.TextFormattingRules topic:
+      * Set SHORTDESCRIPTION = Utility to keep malicious users away from a public Foswiki site
 
-	* Debug plugin: (See output in =data/debug.txt=)
-		* Set DEBUG = 0
+   * Debug plugin: (See output in =data/debug.txt=)
+      * Set DEBUG = 0
 
-	* Log access of blacklist and spam list activities: (0 or 1)
-		* Set LOGACCESS = 1
+   * Log access of blacklist and spam list activities: (0 or 1)
+      * Set LOGACCESS = 1
 
-	* Access restriction:
-		* Set ALLOWTOPICCHANGE = %MAINWEB%.AdminGroup
-		* Set ALLOWTOPICRENAME = %MAINWEB%.AdminGroup
+   * Access restriction:
+      * Set ALLOWTOPICCHANGE = %MAINWEB%.AdminGroup
+      * Set ALLOWTOPICRENAME = %MAINWEB%.AdminGroup
 
 ---+++ WHITELIST, BLACKLIST and BANLIST settings
-	* WHITELIST: Comma delimited list of IP addresses; possible to use partial addresses ending in a dot
-		* Set WHITELIST = 127.0.0.1
+   * WHITELIST: Comma delimited list of IP addresses; possible to use partial addresses ending in a dot
+      * Set WHITELIST = 127.0.0.1
 
-	* BLACKLIST: Comma delimited list of IP addresses; possible to use partial addresses ending in a dot
-		* Set BLACKLIST = 203.88.152., 203.88.155., 219.65.75.
+   * BLACKLIST: Comma delimited list of IP addresses; possible to use partial addresses ending in a dot
+      * Set BLACKLIST = 
 
 #BanList
 <form name="banlist" action="%SCRIPTURL%/viewauth%SCRIPTSUFFIX%/%WEB%/%TOPIC%#BanList" method="post">
-	* BANLIST: Automatically updated list of IP addresses based on BANLIST configuration
-		* Action: <select name="ban_action"> <option></option> <option value="ban_add">Add</option> <option value="ban_remove">Remove</option> </select> IP address(es) <input type="text" name="ip" size="16" value="" /> <input type="submit" value="Submit" /> %BLACKLISTPLUGIN{ action="%URLPARAM{ban_action}%" value="%URLPARAM{ip}%" }%
-		* Current list: %BLACKLISTPLUGIN{ action="ban_show" }%
+   * BANLIST: Automatically updated list of IP addresses based on BANLIST configuration
+      * Action: <select name="ban_action"> <option></option> <option value="ban_add">Add</option> <option value="ban_remove">Remove</option> </select> IP address(es) <input type="text" name="ip" size="16" value="" /> <input type="submit" value="Submit" /> %BLACKLISTPLUGIN{ action="%URLPARAM{ban_action}%" value="%URLPARAM{ip}%" }%
+      * Current list (expires in mins): %BLACKLISTPLUGIN{ action="ban_show" }%
 </form>
 
-	* BANLIST configuration, comma delimited list of: 
-		1 Points for registration
-		2 Points for each save and upload
-		3 Points for view and other actions
-		4 Points for view raw
-		5 Threshold to add to BANLIST
-		6 Measured over time (in seconds)
-		* Set BANLISTCONFIG = 10, 5, 1, 5, 120, 300
-		* Your current score: %BLACKLISTPLUGIN{ action="user_score" }% for IP address %REMOTE_ADDR%
+   * BANLIST configuration, comma delimited list of: 
+      1 Points for registration
+      2 Points for each save and upload
+      3 Points for view and other actions
+      4 Points for view raw
+      5 Threshold to add to BANLIST
+      6 Measured over time (in seconds)
+      * Set BANLISTCONFIG = 10, 5, 1, 5, 120, 300
+      * Your current score: %BLACKLISTPLUGIN{ action="user_score" }% for IP address %REMOTE_ADDR%
 
-	* Message for users on BLACKLIST and BANLIST:
-		* Set BLACKLISTMESSAGE = Your IP address %REMOTE_ADDR% is black listed at the %WIKITOOLNAME% web site due to excessive access or suspicious activities. Please contact site administrator %WIKIWEBMASTER% if you got on the list by mistake.
+   * Message for users on BLACKLIST and BANLIST:
+      * Set BLACKLISTMESSAGE = Your IP address %REMOTE_ADDR% is black listed at the %WIKITOOLNAME% web site due to excessive access or suspicious activities. Please contact site administrator %WIKIWEBMASTER% if you got on the list by mistake.
 
+   * Set the time in minutes until the ban for an IP address expires. Set it to 0 for infinite ban. It is a good idea to define a time since most IP addresses used by spammers are dynamic anyway. It also saves you manual process of users that accidently got banned because they know they can just wait an hour or so. Values like 60 (one hour) or 720 (one day) are good values. Default if the setting is not defined is 0 (disabled).
+      * Set BANEXPIRE = 60
+      
 ---+++ Wiki-spam filtering settings
-	* Filter wiki-spam on topic save and HTML file uploads based on SPAMLIST: (0 or 1)
-		* Set FILTERWIKISPAM = 1
+   * Filter wiki-spam on topic save and HTML file uploads based on SPAMLIST: (0 or 1)
+      * Set FILTERWIKISPAM = 1
 
-	* Comma separated list of Web.Topics to exclude from wiki-spam filtering on topic save:
-		* Set SPAMEXCLUDETOPICS = 
+   * Comma separated list of Web.Topics to exclude from wiki-spam filtering on topic save:
+      * Set SPAMEXCLUDETOPICS = 
 
 #SpamList
 <form name="spamlist" action="%SCRIPTURL%/viewauth%SCRIPTSUFFIX%/%WEB%/%TOPIC%#SpamList" method="post">
-	* Local SPAMLIST: Manually maintained list of spam patterns (NOTE: *Must be* %SYSTEMWEB%.RegularExpression patterns)
-		* Action: <select name="spam_action"> <option></option> <option value="spam_add">Add</option> <option value="spam_remove">Remove</option> </select> wiki-spam regex pattern(s) <code>http://.*?</code><input type="text" name="spam" size="32" value="" /> <input type="submit" value="Submit" /> %BLACKLISTPLUGIN{ action="%URLPARAM{spam_action}%" value="%URLPARAM{spam}%" }%
-		* Current list: %BLACKLISTPLUGIN{ action="spam_show" }%
+   * Local SPAMLIST: Manually maintained list of spam patterns (NOTE: *Must be* %SYSTEMWEB%.RegularExpression patterns)
+      * Action: <select name="spam_action"> <option></option> <option value="spam_add">Add</option> <option value="spam_remove">Remove</option> </select> wiki-spam regex pattern(s) <code>http://.*?</code><input type="text" name="spam" size="32" value="" /> <input type="submit" value="Submit" /> %BLACKLISTPLUGIN{ action="%URLPARAM{spam_action}%" value="%URLPARAM{spam}%" }%
+      * Current list: %BLACKLISTPLUGIN{ action="spam_show" }%
 </form>
 
 #ExcludeList
 <form name="spamlist" action="%SCRIPTURL%/viewauth%SCRIPTSUFFIX%/%WEB%/%TOPIC%#ExcludeList" method="post">
-	* EXCLUDELIST: Manually maintained list of exceptions to public wiki-spam patterns, useful to exclude patterns listed incorrectly as spam (NOTE: *Must be* %SYSTEMWEB%.RegularExpression patterns)
-		* Action: <select name="exclude_action"> <option></option> <option value="exclude_add">Add</option> <option value="exclude_remove">Remove</option> </select> exclude spam regex pattern(s) <code>http://.*?</code><input type="text" name="spam" size="32" value="" /> <input type="submit" value="Submit" /> %BLACKLISTPLUGIN{ action="%URLPARAM{exclude_action}%" value="%URLPARAM{spam}%" }%
-		* Current list: %BLACKLISTPLUGIN{ action="exclude_show" }%
+   * EXCLUDELIST: Manually maintained list of exceptions to public wiki-spam patterns, useful to exclude patterns listed incorrectly as spam (NOTE: *Must be* %SYSTEMWEB%.RegularExpression patterns)
+      * Action: <select name="exclude_action"> <option></option> <option value="exclude_add">Add</option> <option value="exclude_remove">Remove</option> </select> exclude spam regex pattern(s) <code>http://.*?</code><input type="text" name="spam" size="32" value="" /> <input type="submit" value="Submit" /> %BLACKLISTPLUGIN{ action="%URLPARAM{exclude_action}%" value="%URLPARAM{spam}%" }%
+      * Current list: %BLACKLISTPLUGIN{ action="exclude_show" }%
 </form>
 
-	* Public wiki-spam list: Big list of wiki-spam patterns, retrieved from external web site (thanks to <nop>MoinMoin's [[http://moinmoin.wikiwikiweb.de/AntiSpamGlobalSolution][AntiSpamGlobalSolution]] wiki-spam list)
-		* Set SPAMLISTURL = http://arch.thinkmo.de/cgi-bin/spam-merge
+   * Public wiki-spam list: Big list of wiki-spam patterns, retrieved from external web site (thanks to <nop>MoinMoin's [[http://moinmoin.wikiwikiweb.de/AntiSpamGlobalSolution][AntiSpamGlobalSolution]] wiki-spam list)
+      * Set SPAMLISTURL = http://arch.thinkmo.de/cgi-bin/spam-merge
 
-	* Cache refresh time (in minutes) for public wiki-merge pattern list:
-		* Set SPAMLISTREFRESH = 60
+   * Cache refresh time (in minutes) for public wiki-merge pattern list:
+      * Set SPAMLISTREFRESH = 60
 
-	* Cache refresh time (in minutes) for internal wiki-spam regular expression cache:
-		* Set SPAMREGEXREFRESH = 10
+   * Cache refresh time (in minutes) for internal wiki-spam regular expression cache:
+      * Set SPAMREGEXREFRESH = 10
 
-	* Message for users trying to save text with wiki-spam:
-		* Set WIKISPAMMESSAGE = Wiki-spam detected: "%WIKISPAMWORD%" is a banned word and cannot be saved. Your IP address %REMOTE_ADDR% is black listed at the %WIKITOOLNAME% web site due to suspicious activities. Please contact site administrator %WIKIWEBMASTER% if you got on the list by mistake.
-
----+++ Registration protection settings
-	* Protect registration: (number of minutes to expire, 15 minutes is recommended, 0 to disable)
-		* Set REGEXPIRE = 0
-		* If enabled, a magic number is protecting the registration process. Foswiki expects a form field with a magic number. An error message is shown if not valid or if expired. This makes it harder to register a user by a script. A hidden field needs to be added to the registration form:%BR% =&lt;input type="hidden" name="rx" value="%<nop>BLACKLISTPLUGIN{ action="magic" }%" /&gt;=
-
-	* Message shown when using registration form incorrectly: (this message is deliberately vague)
-		* Set REGMESSAGE = Registration failed, please try again.
+   * Message for users trying to save text with wiki-spam:
+      * Set WIKISPAMMESSAGE = Wiki-spam detected: "%WIKISPAMWORD%" is a banned word and cannot be saved. Your IP address %REMOTE_ADDR% is banned at the %WIKITOOLNAME% web site due to suspicious activities. Please contact site administrator %WIKIWEBMASTER% if you got on the list by mistake. The ban will expire after a time set by the administrator.
 
 ---+++ Nofollow link setting
-	* Add a =rel="nofollow"= parameter to external URLs. Use this is to fight Wiki-spam. Search engines will not follow the link if a URL has a nofollow parameter, such as =&lt;a href="http://spammer.com/" rel="nofollow"&gt;=. Specify topic age in hours for which the nofollow parameter should appear (set it to a value that gives you enough time to remove spam); set it to -1 to add the nofollow parameter unconditionally to external URLs; or 0 to disable: (-1, 0, 1...N)
-		* Set NOFOLLOWAGE = -1
+   * Add a =rel="nofollow"= parameter to external URLs. Use this is to fight Wiki-spam. Search engines will not follow the link if a URL has a nofollow parameter, such as =&lt;a href="http://spammer.com/" rel="nofollow"&gt;=. Specify topic age in hours for which the nofollow parameter should appear (set it to a value that gives you enough time to remove spam); set it to -1 to add the nofollow parameter unconditionally to external URLs; or 0 to disable: (-1, 0, 1...N)
+      * Set NOFOLLOWAGE = -1
 
 ---++ Plugin Installation Instructions
 
 __Note:__ You do not need to install anything on the browser to use this plugin. The following instructions are for the administrator who installs the plugin on the server where Foswiki is running. 
 
-	* Download the ZIP file from the Plugin web (see below)
-	* Unzip ==%TOPIC%.zip== in your Foswiki installation directory. Content:
-	  | *File:* | *Description:* |
-	  | ==data/System/%TOPIC%.txt== | Plugin topic |
-	  | ==data/System/%TOPIC%.txt,v== | Plugin topic repository |
-	  | ==lib/Foswiki/Plugins/%TOPIC%.pm== | Plugin Perl module |
-	  | ==pub/Foswiki/%TOPIC%/.htaccess== | Apache access control to protect pub dir |
-	  | ==templates/oopsblacklist.tmpl== | Generic oops message |
-	* Make sure =pub/Foswiki/%TOPIC%/= is writable by the CGI user (typically =nobody=)
-	* Add the hidden form field to the registration form as described in the "Registration protection settings" section
-	* Run the configure utility in your browser to enable the Plugin
-	* Make sure that non-administrators cannot edit this plugin topic. By default, this topic is write protected with an =ALLOWTOPICCHANGE = !AdminGroup= setting.
-	* Test if the installation was successful:
-		1 Using above form, add the IP address of one of your workstations to the BANLIST
-		1 Access Foswiki from that workstation
-			* if you look at a Foswiki topic (with the view script) you should see the BLACKLISTMESSAGE (defined above) after a one minute timeout
-			* else, you should get an 500 Internal Server Error for other scripts
-		1 On a different workstation, remove the IP address of the test workstation from the BANLIST
+   * Download the ZIP file from the Plugin web (see below)
+   * Unzip ==%TOPIC%.zip== in your Foswiki installation directory. Content:
+     | *File:* | *Description:* |
+     | ==data/System/%TOPIC%.txt== | Plugin topic |
+     | ==lib/Foswiki/Plugins/%TOPIC%.pm== | Plugin Perl module |
+   * Run the configure utility in your browser to enable the Plugin
+   * Make sure that non-administrators cannot edit this plugin topic. By default, this topic is write protected with an =ALLOWTOPICCHANGE = !AdminGroup= setting.
+   * Test if the installation was successful:
+      1 Using above form, add the IP address of one of your workstations to the BANLIST
+      1 Access Foswiki from that workstation
+         * if you look at a Foswiki topic (with the view script) you should see the BLACKLISTMESSAGE (defined above) after a small timeout
+         * else, you should get an 500 Internal Server Error for other scripts
+      1 On a different workstation, remove the IP address of the test workstation from the BANLIST
 
 ---++ Known Issues and Limitations
 
-	* Scan for script eval() and escape() is currently hardcoded
+   * Scan for script eval() and escape() is currently hardcoded
 
 ---++ Plugin Info
 
 |  Plugin Author: | Foswiki:Main.KennethLavrsen (from 2009), TWiki:Main/PeterThoeny (until 2007) |
-|  Plugin Version: | 20 Mar 2009 |
+|  Plugin Version: | 04 Jan 2010 |
 |  Change History: | <!-- versions below in reverse order -->&nbsp; |
+|  04 Jan 2010: | Several bug fixes and enhancements Besides the tasks listed below much of the code has been re-written <br /> Foswikitask:Item2500 Magic key protection of registration removed as this has become core feature in Foswiki 1.0.9 <br /> Foswikitask:Item1740 Fixed problem with whitelist not preventing being blacklisted <br /> Foswikitask:Item5409 Fixed problem oopblacklist not showing anything. Now using generic message template instead of an oopsblacklist template <br /> Foswikitask:Item5697 Fixed problem when not setting any banned regexp causes all external links to be detected as spam <br /> Foswikitask:Item1257 Fixed problem where plugin dies on save if not connected to the internet <br /> Foswikitask:Item2570 Plugin no longer needs anything in pub. Removed the entire pub directory from distribution. Upgraders can delete it. <br /> Foswikitask:Item2571 Plugin now has a new feature so banned IP addresses can automatically expire <br /> Foswikitask:Item2572 Plugin now waits only 5 seconds with banned IP to avoid itself a DOS target. Message reduced to simple text screen that does not load Foswiki as much during a site sucking attack <br /> Foswikitask:Item2573 Plugin no longer ships with default blacklisted IP ranges. The admins should decide themselves at installation |
 |  20 Mar 2009: | Ported to Foswiki by Kenneth Lavrsen and given as Feel Free To Modify in Foswiki context |
 |  29 Mar 2007: | Doc fixes; change view=raw penalty from 20 to 5 |
 |  18 Mar 2007: | Scan for evil script eval() and escape() in topic text and attachments; support for TWiki 4.2 (using new =TWiki::Func::getExternalResource=) |
@@ -169,7 +162,7 @@ __Note:__ You do not need to install anything on the browser to use this plugin.
 |  Perl Version: | 5.005 |
 |  License: | GPL ([[http://www.gnu.org/copyleft/gpl.html][GNU General Public License]]) |
 |  Plugin Home: | http://foswiki.org/Extensions/%TOPIC% |
-|  Feedback: | http://foswiki.org/Support/%TOPIC% |
+|  Support: | http://foswiki.org/Support/%TOPIC% |
 
 __Related Topics:__ %SYSTEMWEB%.DefaultPreferences, %USERSWEB%.SitePreferences, [[%SYSTEMWEB%.Plugins][Plugins]], [[http://directory.google.com/Top/Computers/Internet/Abuse/Spam/Wikispam/][Google wiki spam directory]]
 
