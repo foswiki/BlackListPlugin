@@ -361,7 +361,7 @@ sub _getSpamListRegex
     # spam list and the public list has never been loaded    
     return '' unless $text;
     
-    $text = "(http://[\\w\\.\\-:\\@/]*?($text))";
+    $text = "($Foswiki::regex{linkProtocolPattern}://[\\w\\.\\-:\\@/]*?($text))";
     
     Foswiki::Func::saveFile( $cacheFile, $text );
     return $text;
