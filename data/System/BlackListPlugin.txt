@@ -18,15 +18,15 @@ On topic save, text is compared to a known list of spam patterns. If wiki-spam i
 
 Users on the BLACKLIST and BANLIST will have every page access delayed by at least 5 seconds and will get an error message.
 
-The ban can be set to expire after a number of minutes to minimize the maintenance when a spammer uses dynamic IP address or someone accidently gets banned.
+The ban can be set to expire after a number of minutes to minimize maintenance where spammers use dynamic IP addresses or someone accidently gets banned.
 
-To fight Wiki-spam, the Plugin can also add a =rel="nofollow"= parameter to external URLs. Search engines will not follow links that have this parameter, taking away the incentive to add spam to Foswiki.
+To fight wiki-spam, the plugin can also add a =rel="nofollow"= parameter to external URLs. Search engines will not follow links that have this parameter, taking away the incentive to add spam to Foswiki.
 
 ---++ Plugin Settings
 
 Plugin settings are stored as preferences variables. To reference a plugin setting write ==%<nop>&lt;plugin&gt;_&lt;setting&gt;%==, i.e. ==%<nop>BLACKLISTPLUGIN_SETTING%==
 
-%X% Note: Settings made in this plugin topic will be overwritten next time you upgrade the plugin. You are adviced to define the settings in %LOCALSITEPREFS% using the format %<nop>BLACKLISTPLUGIN_SETTING%. Remember to add the settings to the list of FINALPREFERENCES in %LOCALSITEPREFS%.
+%X% Note: Settings made in this plugin topic will be overwritten next time you upgrade the plugin. You are advised to define the settings in %LOCALSITEPREFS% using the format %<nop>BLACKLISTPLUGIN_SETTING%. Remember to add the settings to the list of FINALPREFERENCES in %LOCALSITEPREFS%.
 
 ---+++ General settings
    * One line description, is shown in the %SYSTEMWEB%.TextFormattingRules topic:
@@ -88,12 +88,21 @@ Plugin settings are stored as preferences variables. To reference a plugin setti
 
 #ExcludeList
 <form name="spamlist" action="%SCRIPTURL%/viewauth%SCRIPTSUFFIX%/%WEB%/%TOPIC%#ExcludeList" method="post">
-   * EXCLUDELIST: Manually maintained list of exceptions to public wiki-spam patterns, useful to exclude patterns listed incorrectly as spam (NOTE: *Must be* %SYSTEMWEB%.RegularExpression patterns)
+   * EXCLUDELIST: Manually maintained list of exceptions to public wiki-spam patterns, useful to exclude patterns listed incorrectly as spam
+      * *NOTE:* These are %SYSTEMWEB%.RegularExpression patterns which are applied to the public wiki-spam pattern list. The final regular expression that is used to detect wiki-spam is built roughly as follows:
+         * The public wiki-spam list is downloaded
+         * Joined with local SPAMLIST
+         * Comment lines are removed
+         * Lines containing spaces or '&lt;' or '&gt;' characters are removed
+         * Each EXCLUDELIST pattern is applied to the (newline separated) expression that's been built so far
+         * Matching regions of the expression are deleted
+         * Empty lines are removed
+         * Remaining newlines are removed and joined with '|'
       * Action: <select name="exclude_action"> <option></option> <option value="exclude_add">Add</option> <option value="exclude_remove">Remove</option> </select> exclude spam regex pattern(s) <code>http://.*?</code><input type="text" name="spam" size="32" value="" /> <input type="submit" value="Submit" /> %BLACKLISTPLUGIN{ action="%URLPARAM{exclude_action}%" value="%URLPARAM{spam}%" }%
       * Current list: %BLACKLISTPLUGIN{ action="exclude_show" }%
 </form>
 
-   * Public wiki-spam list: Big list of wiki-spam patterns, retrieved from external web site (thanks to <nop>MoinMoin's [[http://moinmoin.wikiwikiweb.de/AntiSpamGlobalSolution][AntiSpamGlobalSolution]] wiki-spam list)
+   * Public wiki-spam list: a big list of wiki-spam patterns, retrieved from external web site (thanks to <nop>MoinMoin's [[http://moinmoin.wikiwikiweb.de/AntiSpamGlobalSolution][AntiSpamGlobalSolution]] wiki-spam list)
       * Set SPAMLISTURL = http://arch.thinkmo.de/cgi-bin/spam-merge
 
    * Cache refresh time (in minutes) for public wiki-merge pattern list:
@@ -136,6 +145,7 @@ __Note:__ You do not need to install anything on the browser to use this plugin.
 |  Plugin Author: | Foswiki:Main.KennethLavrsen (from 2009), TWiki:Main/PeterThoeny (until 2007) |
 |  Plugin Version: | 04 Jan 2010 |
 |  Change History: | <!-- versions below in reverse order -->&nbsp; |
+|  05 Jan 2010: | Foswikitask:Item2576 Minor documentation changes |
 |  04 Jan 2010: | Several bug fixes and enhancements Besides the tasks listed below much of the code has been re-written <br /> Foswikitask:Item2500 Magic key protection of registration removed as this has become core feature in Foswiki 1.0.9 <br /> Foswikitask:Item1740 Fixed problem with whitelist not preventing being blacklisted <br /> Foswikitask:Item5409 Fixed problem oopblacklist not showing anything. Now using generic message template instead of an oopsblacklist template <br /> Foswikitask:Item5697 Fixed problem when not setting any banned regexp causes all external links to be detected as spam <br /> Foswikitask:Item1257 Fixed problem where plugin dies on save if not connected to the internet <br /> Foswikitask:Item2570 Plugin no longer needs anything in pub. Removed the entire pub directory from distribution. Upgraders can delete it. <br /> Foswikitask:Item2571 Plugin now has a new feature so banned IP addresses can automatically expire <br /> Foswikitask:Item2572 Plugin now waits only 5 seconds with banned IP to avoid itself a DOS target. Message reduced to simple text screen that does not load Foswiki as much during a site sucking attack <br /> Foswikitask:Item2573 Plugin no longer ships with default blacklisted IP ranges. The admins should decide themselves at installation |
 |  20 Mar 2009: | Ported to Foswiki by Kenneth Lavrsen and given as Feel Free To Modify in Foswiki context |
 |  29 Mar 2007: | Doc fixes; change view=raw penalty from 20 to 5 |
