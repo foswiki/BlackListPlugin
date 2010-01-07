@@ -148,7 +148,7 @@ sub initPlugin
             # check for new candidate of black sheep
 
             my( $c1, $c2, $c3, $c4, $c5, $c6 ) =
-                split( /,\s*/, Foswiki::Func::getPreferencesValue( "\U$pluginName\E_BANLISTCONFIG" ) );
+                split( /,\s*/, ( Foswiki::Func::getPreferencesValue( "\U$pluginName\E_BANLISTCONFIG")  || '' ) );
             $cfg{ "ptReg" }   = $c1 || 10;
             $cfg{ "ptChg" }   = $c2 || 5;
             $cfg{ "ptView" }  = $c3 || 1;
