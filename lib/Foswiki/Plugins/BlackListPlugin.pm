@@ -49,7 +49,7 @@ our $VERSION = '$Rev$';
 # This is a free-form string you can use to "name" your own plugin version.
 # It is *not* used by the build automation tools, but is reported as part
 # of the version number in PLUGINDESCRIPTIONS.
-our $RELEASE = '04 Jan 2010';
+our $RELEASE = '08 Jan 2010';
 
 our $pluginName = 'BlackListPlugin';  # Name of this Plugin
 our %cfg =
