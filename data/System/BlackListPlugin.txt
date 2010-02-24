@@ -29,10 +29,10 @@ Plugin settings are stored as preferences variables. To reference a plugin setti
 %X% Note: Settings made in this plugin topic will be overwritten next time you upgrade the plugin. You are advised to define the settings in %LOCALSITEPREFS% using the format %<nop>BLACKLISTPLUGIN_SETTING%. Remember to add the settings to the list of FINALPREFERENCES in %LOCALSITEPREFS%.
 
 ---+++ General settings
-   * One line description, is shown in the %SYSTEMWEB%.TextFormattingRules topic:
-      * Set SHORTDESCRIPTION = Utility to keep malicious users away from a public Foswiki site
-
-   * Debug plugin: (See output in =data/debug.txt=)
+<!--
+      * Set SHORTDESCRIPTION = %$SHORTDESCRIPTION%
+-->
+   * Debug plugin: (See output in Foswiki logs)
       * Set DEBUG = 0
 
    * Log access of blacklist and spam list activities: (0 or 1)
@@ -119,15 +119,7 @@ Plugin settings are stored as preferences variables. To reference a plugin setti
       * Set NOFOLLOWAGE = -1
 
 ---++ Plugin Installation Instructions
-
-__Note:__ You do not need to install anything on the browser to use this plugin. The following instructions are for the administrator who installs the plugin on the server where Foswiki is running. 
-
-   * Download the ZIP file from the Plugin web (see below)
-   * Unzip ==%TOPIC%.zip== in your Foswiki installation directory. Content:
-     | *File:* | *Description:* |
-     | ==data/System/%TOPIC%.txt== | Plugin topic |
-     | ==lib/Foswiki/Plugins/%TOPIC%.pm== | Plugin Perl module |
-   * Run the configure utility in your browser to enable the Plugin
+%$INSTALL_INSTRUCTIONS%
    * Make sure that non-administrators cannot edit this plugin topic. By default, this topic is write protected with an =ALLOWTOPICCHANGE = !AdminGroup= setting.
    * Test if the installation was successful:
       1 Using above form, add the IP address of one of your workstations to the BANLIST
@@ -143,8 +135,10 @@ __Note:__ You do not need to install anything on the browser to use this plugin.
 ---++ Plugin Info
 
 |  Plugin Author: | Foswiki:Main.KennethLavrsen (from 2009), TWiki:Main/PeterThoeny (until 2007) |
-|  Plugin Version: | 08 Jan 2010 |
+|  Release: | %$RELEASE% |
+|  Plugin Version: | %$VERSION% |
 |  Change History: | <!-- versions below in reverse order -->&nbsp; |
+|  24 Feb 2010: | Foswikitask:Item2008 updated to use Foswiki 1.1 Func API |
 |  08 Jan 2010: | Foswikitask:Item2576 Minor documentation changes<br/> Foswikitask:Item2577 Also support https spam links |
 |  04 Jan 2010: | Several bug fixes and enhancements Besides the tasks listed below much of the code has been re-written <br /> Foswikitask:Item2500 Magic key protection of registration removed as this has become core feature in Foswiki 1.0.9 <br /> Foswikitask:Item1740 Fixed problem with whitelist not preventing being blacklisted <br /> Foswikitask:Item5409 Fixed problem oopblacklist not showing anything. Now using generic message template instead of an oopsblacklist template <br /> Foswikitask:Item5697 Fixed problem when not setting any banned regexp causes all external links to be detected as spam <br /> Foswikitask:Item1257 Fixed problem where plugin dies on save if not connected to the internet <br /> Foswikitask:Item2570 Plugin no longer needs anything in pub. Removed the entire pub directory from distribution. Upgraders can delete it. <br /> Foswikitask:Item2571 Plugin now has a new feature so banned IP addresses can automatically expire <br /> Foswikitask:Item2572 Plugin now waits only 5 seconds with banned IP to avoid itself a DOS target. Message reduced to simple text screen that does not load Foswiki as much during a site sucking attack <br /> Foswikitask:Item2573 Plugin no longer ships with default blacklisted IP ranges. The admins should decide themselves at installation |
 |  20 Mar 2009: | Ported to Foswiki by Kenneth Lavrsen and given as Feel Free To Modify in Foswiki context |

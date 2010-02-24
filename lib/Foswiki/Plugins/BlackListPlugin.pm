@@ -49,7 +49,7 @@ our $VERSION = '$Rev$';
 # This is a free-form string you can use to "name" your own plugin version.
 # It is *not* used by the build automation tools, but is reported as part
 # of the version number in PLUGINDESCRIPTIONS.
-our $RELEASE = '08 Jan 2010';
+our $RELEASE = '24 Feb 2010';
 
 our $pluginName = 'BlackListPlugin';  # Name of this Plugin
 our %cfg =
@@ -795,25 +795,29 @@ sub _writeLog
     my ( $theText ) = @_;
 
     if( Foswiki::Func::getPreferencesFlag( "\U$pluginName\E_LOGACCESS" ) ) {
-        # Note there is no API for writing to the normal log
-        # so we write directly to the log instead of using internal functions
-        # which change once a year on average    
-        my $log = $Foswiki::cfg{LogFileName};
-        my $now = time();
-        my $stamp = Foswiki::Func::formatTime( $now, '$year$mo', 'servertime' );
-        $log =~ s/%DATE%/$stamp/go;
-        my $time = Foswiki::Func::formatTime( $now, 'iso', 'gmtime' );
-        my $remoteAddr = $ENV{'REMOTE_ADDR'}   || "";
-        # Example log line
-        # | 2009-03-25T22:18:45Z info | MyName | blacklist | Myweb.BlackListTest | /foswiki10/bin/save | 192.168.1.11 | 
-        my $message = "| $time info | $user | blacklist | $web.$topic | $theText | $remoteAddr |";
-        my $file;
-        if ( open( $file, '>>', $log ) ) {
-            print $file "$message\n";
-            close($file);
-        }
-        else {
-            Foswiki::Func::writeWarning("BlackListPlugin could not write to the normal log - message was $message");
+        if (defined &Foswiki::Func::writeEvent) {
+            Foswiki::Func::writeEvent('blacklist', $theText );
+        } else {
+            # Pre 1.1 foswiki; there is no API for writing to the normal log
+            # so we write directly to the log instead of using internal
+            # functions which change once a year on average    
+            my $log = $Foswiki::cfg{LogFileName};
+            my $now = time();
+            my $stamp = Foswiki::Func::formatTime( $now, '$year$mo', 'servertime' );
+            $log =~ s/%DATE%/$stamp/go;
+            my $time = Foswiki::Func::formatTime( $now, 'iso', 'gmtime' );
+            my $remoteAddr = $ENV{'REMOTE_ADDR'}   || "";
+            # Example log line
+            # | 2009-03-25T22:18:45Z info | MyName | blacklist | Myweb.BlackListTest | /foswiki10/bin/save | 192.168.1.11 | 
+            my $message = "| $time info | $user | blacklist | $web.$topic | $theText | $remoteAddr |";
+            my $file;
+            if ( open( $file, '>>', $log ) ) {
+                print $file "$message\n";
+                close($file);
+            }
+            else {
+                Foswiki::Func::writeWarning("BlackListPlugin could not write to the normal log - message was $message");
+            }
         }
         
         writeDebug( "BLACKLIST access, $web/$topic, $theText" );
